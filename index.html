@@ -1,0 +1,108 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>BM Chat</title>
+  <style>
+    body { font-family: sans-serif; max-width: 500px; margin: auto; padding: 20px; }
+    #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; }
+    .message { margin-bottom: 10px; }
+    input, button { padding: 10px; width: 100%; margin-top: 10px; }
+    #usersList button { width: auto; margin: 3px; padding: 5px 10px; }
+  </style>
+</head>
+<body>
+
+  <h2>BM Chat</h2>
+
+  <input type="text" id="username" placeholder="Adını yaz">
+  <input type="text" id="messageInput" placeholder="Mesajını yaz">
+  <button onclick="sendMessage()">Göndər</button>
+
+  <div id="usersList"></div>
+  <div id="messages"></div>
+
+  <!-- Firebase SDK-ları -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZFhAzcZ4VYRXF6WdM8xEaIW1IkXkiZAI",
+      authDomain: "bm-chat-92975.firebaseapp.com",
+      databaseURL: "https://bm-chat-92975-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "bm-chat-92975",
+      storageBucket: "bm-chat-92975.appspot.com",
+      messagingSenderId: "382828188263",
+      appId: "1:382828188263:web:bdad8f64f03f810449fac2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const usersRef = ref(db, "users");
+    const messagesDiv = document.getElementById("messages");
+    const usersListDiv = document.getElementById("usersList");
+    let currentChatRef = null;
+
+    // Yeni istifadəçi əlavə et
+    document.getElementById("username").addEventListener("change", () => {
+      const name = document.getElementById("username").value;
+      if (name) {
+        set(ref(db, "users/" + name), true);
+      }
+    });
+
+    // İstifadəçilər siyahısını göstər
+    onValue(usersRef, (snapshot) => {
+      usersListDiv.innerHTML = "<h4>İstifadəçilər:</h4>";
+      snapshot.forEach((child) => {
+        const otherUser = child.key;
+        const myName = document.getElementById("username").value;
+        if (otherUser !== myName) {
+          const btn = document.createElement("button");
+          btn.textContent = otherUser;
+          btn.onclick = () => startPrivateChat(otherUser);
+          usersListDiv.appendChild(btn);
+        }
+      });
+    });
+
+    // 1-ə-1 chat başlat
+    function startPrivateChat(otherUser) {
+      const myName = document.getElementById("username").value;
+      if (!myName) return alert("Əvvəl adını yaz!");
+
+      const chatId = [myName, otherUser].sort().join("_");
+      currentChatRef = ref(db, "privateChats/" + chatId);
+
+      messagesDiv.innerHTML = `<h4>${otherUser} ilə şəxsi söhbət</h4>`;
+
+      // Mesajlara qulaq as
+      onChildAdded(currentChatRef, (data) => {
+        const msg = data.val();
+        const div = document.createElement("div");
+        div.className = "message";
+        div.textContent = `[${msg.time}] ${msg.name}: ${msg.text}`;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+    }
+
+    // Mesaj göndər
+    window.sendMessage = function () {
+      const username = document.getElementById("username").value;
+      const message = document.getElementById("messageInput").value;
+      if (username && message && currentChatRef) {
+        push(currentChatRef, {
+          name: username,
+          text: message,
+          time: new Date().toLocaleTimeString()
+        });
+        document.getElementById("messageInput").value = "";
+      }
+    };
+  </script>
+
+</body>
+</html>
